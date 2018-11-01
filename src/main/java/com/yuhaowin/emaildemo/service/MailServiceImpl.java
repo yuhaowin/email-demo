@@ -10,21 +10,20 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import org.springframework.ui.freemarker.FreeMarkerTemplateUtils;
 import org.springframework.web.servlet.view.freemarker.FreeMarkerConfigurer;
 
 import javax.mail.MessagingException;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
+import javax.mail.internet.MimeUtility;
 import java.io.File;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.HashMap;
-import java.util.Map;
 
-@Component
+@Service
 public class MailServiceImpl implements MailService {
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
@@ -38,6 +37,9 @@ public class MailServiceImpl implements MailService {
     @Autowired
     private FreeMarkerConfigurer configurer;
 
+    /**
+     * 发件人
+     */
     @Value("${mail.fromMail.addr}")
     private String from;
 
@@ -60,7 +62,7 @@ public class MailServiceImpl implements MailService {
 
 
     @Override
-    public void sendHtmlMail(String to, String subject, String content) {
+    public void sendHtmlMail(String to, String subject, String html) {
         MimeMessage message = mailSender.createMimeMessage();
 
         try {
@@ -69,7 +71,7 @@ public class MailServiceImpl implements MailService {
             helper.setFrom(from);
             helper.setTo(to);
             helper.setSubject(subject);
-            helper.setText(content, true);
+            helper.setText(html, true);
 
             mailSender.send(message);
             logger.info("html邮件发送成功");
@@ -79,7 +81,29 @@ public class MailServiceImpl implements MailService {
     }
 
     @Override
-    public void sendTemplateMail(Object params, String title, String templateName) {
+    public void sendAttachmentsMail(String[] to, String[] copyto, String subject, String content, String[] filePaths) {
+        try {
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true);
+            helper.setFrom(from);
+            helper.setTo(to);
+            helper.setSubject(subject);
+            //设置多附件
+            for (String filePath : filePaths) {
+                FileSystemResource file = new FileSystemResource(new File(filePath));
+                String filename = file.getFilename();
+                String text = MimeUtility.encodeText(filename, "UTF-8", "B");
+                helper.addAttachment(text, file);
+            }
+            helper.setText(content, true);
+            mailSender.send(mimeMessage);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void sendTemplateMail(Object model, String title, String templateName) {
         try {
             MimeMessage mimeMessage = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true);
@@ -89,16 +113,9 @@ public class MailServiceImpl implements MailService {
             //邮件标题
             helper.setSubject("【" + title + "-" + LocalDate.now() + " " + LocalTime.now().withNano(0) + "】");
 
-
             FileSystemResource file = new FileSystemResource(new File("/Users/yuhao/Pictures/Personal/yuhao.jpg"));
 
-
-            //String fileName = filePath.substring(filePath.lastIndexOf(File.separator));
-
-            helper.addAttachment("测试",file);
-
-            Map<String, Object> model = new HashMap<>();
-            model.put("params", params);
+            helper.addAttachment("测试", file);
             try {
                 Template template = configurer.getConfiguration().getTemplate(templateName);
                 try {
@@ -116,4 +133,34 @@ public class MailServiceImpl implements MailService {
             e.printStackTrace();
         }
     }
+
+    @Override
+    public void sendTemplateMail(Object data, String[] to, String[] copyto, String subject, String templateName, String[] filePaths) {
+        try {
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true);
+            //设置发件人
+            helper.setFrom(from);
+            //设置收件人
+            helper.setTo(to);
+            //设置抄送人
+            helper.setCc(copyto);
+            //邮件标题
+            helper.setSubject(subject);
+            //设置多附件
+            for (String filePath : filePaths) {
+                FileSystemResource file = new FileSystemResource(new File(filePath));
+                String filename = file.getFilename();
+                String text = MimeUtility.encodeText(filename, "UTF-8", "B");
+                helper.addAttachment(text, file);
+            }
+            Template template = configurer.getConfiguration().getTemplate(templateName);
+            String content = FreeMarkerTemplateUtils.processTemplateIntoString(template, data);
+            helper.setText(content, true);
+            mailSender.send(mimeMessage);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 }
+

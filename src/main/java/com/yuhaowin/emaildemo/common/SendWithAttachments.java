@@ -1,19 +1,26 @@
 package com.yuhaowin.emaildemo.common;
 
+import freemarker.template.Template;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.expression.spel.ast.NullLiteral;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.ui.freemarker.FreeMarkerTemplateUtils;
+import org.springframework.web.servlet.view.freemarker.FreeMarkerConfigurer;
 
 import javax.activation.DataHandler;
 import javax.activation.FileDataSource;
 import javax.mail.*;
 import javax.mail.internet.*;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 
 /**
  * 发送邮件并附带附件
  */
+@Component
 public class SendWithAttachments {
 
     private static Logger logger = LoggerFactory.getLogger(SendWithAttachments.class);
@@ -37,6 +44,12 @@ public class SendWithAttachments {
      * Multipart对象,邮件内容,标题,附件等内容均添加到其中后再生成MimeMessage对象
      */
     private Multipart mp;
+
+    /**
+     * 发送邮件的模板引擎
+     */
+    @Autowired
+    private FreeMarkerConfigurer configurer;
 
 
     /**
@@ -71,6 +84,7 @@ public class SendWithAttachments {
         session.setDebug(true);
         mimeMsg = new MimeMessage(session);
         mp = new MimeMultipart();
+
     }
 
     /**
@@ -134,6 +148,17 @@ public class SendWithAttachments {
         return true;
     }
 
+    public Boolean sendTemplateMail(String from, String[] to, String[] copyto, String subject, String templateName, Object model, String[] files) {
+        try {
+            Template template = configurer.getConfiguration().getTemplate(templateName);
+            String content = FreeMarkerTemplateUtils.processTemplateIntoString(template, model);
+            return sendMail(from, to, copyto, subject, content, files);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
     public static void main(String[] args) {
         String smtp = "smtp.126.com";
         String port = "25";
@@ -147,10 +172,14 @@ public class SendWithAttachments {
                 "742396846@qq.com"
         };
         String subject = "发送附件测试";
-        String content = "请查收附件";
+        String templateName = "message.ftl";
         String filename = "D://1.txt|D://2.txt";
         String[] files = filename.split("\\|");
+        Map map = new HashMap();
+        map.put("messageCode","323232");
+        map.put("messageStatus","状态");
+        map.put("cause","45544545");
         SendWithAttachments email = new SendWithAttachments("true", smtp, port, username, password);
-        email.sendMail(from, to, copyto, subject, content, null);
+        email.sendTemplateMail(from, to, copyto, subject, templateName, map,null);
     }
 }
