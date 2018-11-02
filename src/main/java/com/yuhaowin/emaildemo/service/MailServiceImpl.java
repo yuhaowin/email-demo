@@ -17,7 +17,6 @@ import org.springframework.web.servlet.view.freemarker.FreeMarkerConfigurer;
 import javax.mail.MessagingException;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
-import javax.mail.internet.MimeUtility;
 import java.io.File;
 import java.io.IOException;
 import java.time.LocalDate;
@@ -42,6 +41,14 @@ public class MailServiceImpl implements MailService {
      */
     @Value("${mail.fromMail.addr}")
     private String from;
+
+    /**
+     * 解决附件名称过长会被分割处理,导致一些邮件客户端附件
+     * 名显示乱码问题
+     */
+    static {
+        System.setProperty("mail.mime.splitlongparameters", "false");
+    }
 
     @Override
     public void sendSimpleMail(String to, String subject, String content) {
@@ -92,8 +99,7 @@ public class MailServiceImpl implements MailService {
             for (String filePath : filePaths) {
                 FileSystemResource file = new FileSystemResource(new File(filePath));
                 String filename = file.getFilename();
-                String text = MimeUtility.encodeText(filename, "UTF-8", "B");
-                helper.addAttachment(text, file);
+                helper.addAttachment(filename, file);
             }
             helper.setText(content, true);
             mailSender.send(mimeMessage);
@@ -151,8 +157,7 @@ public class MailServiceImpl implements MailService {
             for (String filePath : filePaths) {
                 FileSystemResource file = new FileSystemResource(new File(filePath));
                 String filename = file.getFilename();
-                String text = MimeUtility.encodeText(filename, "UTF-8", "B");
-                helper.addAttachment(text, file);
+                helper.addAttachment(filename, file);
             }
             Template template = configurer.getConfiguration().getTemplate(templateName);
             String content = FreeMarkerTemplateUtils.processTemplateIntoString(template, data);
@@ -163,4 +168,3 @@ public class MailServiceImpl implements MailService {
         }
     }
 }
-
